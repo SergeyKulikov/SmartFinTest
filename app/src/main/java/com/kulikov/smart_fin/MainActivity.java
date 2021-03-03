@@ -66,18 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private String TAG = MainActivity.class.getSimpleName();
 
     private AppBarConfiguration mAppBarConfiguration;
-    private String currentWeight;
-    private boolean isSetDecimalSeparator = false;
-    private LiveData<List<ProductItem>> productList;
-    private List<CategoryItem> categoryList;
     private SmatrfinDao smatrfinDaoDatbase;
-
-    // private ViewPager2 myViewPager2;
-    // private TabLayoutAdapter tabLayoutAdapter;
-    private ArrayList<String> arrayList = new ArrayList<>();
-
-    private EditText search;
-
 
     @SuppressLint("UseCompatLoadingForDrawables")
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -87,19 +76,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
-
-        search = new EditText(this);
-        search.setCompoundDrawables(getApplicationContext().getDrawable(android.R.drawable.ic_search_category_default), null, null, null);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams( LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.setMargins(200, 0, 0, 40);
-        search.setLayoutParams(params);
-
-
-
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
-        toolbar.addView(search);
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         NavigationView navigationView = findViewById(R.id.nav_view);
@@ -116,27 +94,6 @@ public class MainActivity extends AppCompatActivity {
         smatrfinDaoDatbase = SmatrfinApp.getInstance().getSmatrfinDatabase().getDaoDatabase();
 
         new ProductGenerator().execute();
-        new GetCategory().execute();
-    }
-
-    private class GetCategory extends AsyncTask<Void, Void, Void> {
-        List<CategoryItem> categoryItems;
-
-        @Override
-        protected Void doInBackground(Void... voids) {
-            if (categoryItems == null) {
-                categoryItems = new ArrayList<>();
-            }
-            categoryItems = smatrfinDaoDatbase.loadCategoryList();
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            // createTabs(categoryItems);
-            categoryItems = null;
-            super.onPostExecute(aVoid);
-        }
     }
 
     @Override
