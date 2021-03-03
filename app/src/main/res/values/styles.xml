@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="TextViewAsEditView" parent="@android:style/Widget.EditText">
+
+        <item name="colorControlHighlight">#ff19a1d8</item>
+    </style>
+
+</resources>
