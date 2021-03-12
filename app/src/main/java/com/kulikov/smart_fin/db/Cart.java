@@ -5,6 +5,7 @@ import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 import com.kulikov.smart_fin.MyRoundNumeric;
+import com.kulikov.smart_fin.ProductList;
 import com.kulikov.smart_fin.ProductMap;
 import com.kulikov.smart_fin.db.CartItem;
 import com.kulikov.smart_fin.db.ProductItem;
@@ -22,8 +23,14 @@ public class Cart {
     @Ignore
     private List<CartItem> items;
 
-    public Cart(List<CartItem> items) {
-        this.items = items;
+    @Ignore
+    private static Cart instance;
+
+    public static Cart getInstance() {
+        if (instance == null) {
+            instance = new Cart();
+        }
+        return instance;
     }
 
     public Cart() {
@@ -74,19 +81,6 @@ public class Cart {
         this.receiptTime = cart.receiptTime;
         this.items.clear();
         this.items.addAll(cart.items);
-
-        /*
-        for (int i=0; i<this.items.size(); i++) {
-            String id_product = this.items.get(i).getUid_product();
-            if (ProductMap.getItems().containsKey(id_product)) {
-                this.items.get(i).setProductName(
-                        ProductMap.getItems().get(id_product).getName()
-                );
-            }
-        }
-
-         */
-
     }
 
     private void append(int idx, CartItem item) {
@@ -121,9 +115,7 @@ public class Cart {
         int idx = this.items.indexOf(cartItem);
         if (idx == -1) {
             cartItem.setValue(value);
-            cartItem.setSum(item.getPrice()*value);
-            // TODO: округлить сумму до 2 знаков
-
+            cartItem.setSum(item.getPrice()*value); // Округление внутри setSum
             this.items.add(cartItem);
         } else {
             append(idx, cartItem);

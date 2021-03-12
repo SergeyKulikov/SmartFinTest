@@ -15,22 +15,14 @@ import java.util.List;
 public class HomeViewModel extends ViewModel {
 
     private MutableLiveData<String> mText;
-    // private MutableLiveData<List<CategoryItem>> mCategories;
 
     public HomeViewModel() {
         mText = new MutableLiveData<>();
         mText.setValue("This is home fragment");
-
-        // mCategories = new MutableLiveData<>();
-        // mCategories.postValue(db.loadCategoryList());
     }
 
     public LiveData<String> getText() {
         return mText;
     }
-    /*public LiveData<List<CategoryItem>> getCategories() {
-        return mCategories;
-    }*/
-
 
 }

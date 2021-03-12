@@ -17,21 +17,12 @@ import com.kulikov.smart_fin.db.CartItem;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class CartAdapter extends RecyclerView.Adapter<CartAdapter.MyViewHolder> {
 
     private Context context;
     private List<CartItem> cartItems;
-
-    public CartAdapter(Context context, List<CartItem> cartItems) {
-        this.context = context;
-        if (this.cartItems == null) {
-            this.cartItems = new ArrayList<>();
-        }
-        this.cartItems.clear();
-        this.cartItems.addAll(cartItems);
-        notifyDataSetChanged();
-    }
 
     public CartAdapter(Context context, Cart cart) {
         this.context = context;
@@ -68,7 +59,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.MyViewHolder> 
         holder.tvProductName.setText(cartItems.get(position).getProductName());
         holder.tvProductCalculation.setText(getCalculationString(position));
         holder.getTvProductPrice.setText(getPriceString(position));
-        holder.tvProductSum.setText( String.format("%.2f", cartItems.get(position).getSum()) );
+        holder.tvProductSum.setText( String.format(Locale.getDefault(), "%.2f", cartItems.get(position).getSum()) );
     }
 
     @SuppressLint("DefaultLocale")
@@ -92,7 +83,6 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.MyViewHolder> 
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
         private TextView tvProductName, tvProductCalculation, getTvProductPrice, tvProductSum;
-        private Button btnPay;
 
         public MyViewHolder(@NonNull View itemView) {
             super(itemView);

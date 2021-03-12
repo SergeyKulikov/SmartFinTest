@@ -19,6 +19,10 @@ import com.kulikov.smart_fin.db.ProductItem;
 
 import java.util.List;
 
+/**
+ *
+ */
+
 public class ProductFragment extends Fragment {
     private ProductItem productItem;
     private long color;
@@ -32,7 +36,7 @@ public class ProductFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
     }
 
-    @SuppressLint("NewApi")
+    @SuppressLint({"NewApi", "UseCompatLoadingForDrawables"})
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         // return super.onCreateView(inflater, container, savedInstanceState);
@@ -40,31 +44,36 @@ public class ProductFragment extends Fragment {
         view.setOnClickListener(clickListener);
 
         tvProductName = view.findViewById(R.id.tvProductName);
-        // tvProductCalcutation = view.findViewById(R.id.tvProductCalcutation);
         imageView = view.findViewById(R.id.imageView);
         ivGroupColor = view.findViewById(R.id.ivGroupColor);
 
         imageView.setImageDrawable(getActivity().getResources().getDrawable(productItem.getRes_id_image()));
         tvProductName.setText(this.productItem.getName());
 
+        // Это варант падает с ошибкой:
+        // java.lang.IllegalArgumentException: Invalid ID, must be in the range [0..16]
+        // ivGroupColor.setBackgroundColor(Color.toArgb(color));
+
+        // А вот так все работает
         int A = (int)(color >> 24) & 0xff; // or color >>> 24
         int R = (int)(color >> 16) & 0xff;
         int G = (int)(color >>  8) & 0xff;
         int B = (int)(color      ) & 0xff;
 
-        Color cl = new Color();
-
-        ivGroupColor.setBackgroundColor(cl.argb(A,R,G,B)); // from a color int);
+        ivGroupColor.setBackgroundColor(Color.argb(A,R,G,B)); // from a color int);
         return view;
     }
 
     public View.OnClickListener clickListener = view -> {
+        // Делаем public, чтобы можно было переопределить снаружи и там прописать, что делать
+        // по нажалию на фрагмент
     };
 
     public void setData(ProductItem productItem, List<CategoryItem> categoryItems) {
         this.productItem = new ProductItem();
         this.productItem = productItem;
 
+        // Цвет полосочки нужно забрать из категории
         for (int i = 0; i < categoryItems.size(); i++) {
             if (this.productItem.getUid_category().equals(categoryItems.get(i).getUid())) {
                 color = categoryItems.get(i).getColor();

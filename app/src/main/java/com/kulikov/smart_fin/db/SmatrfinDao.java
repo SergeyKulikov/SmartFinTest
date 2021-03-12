@@ -1,28 +1,22 @@
 package com.kulikov.smart_fin.db;
 
-import androidx.lifecycle.LiveData;
+
 import androidx.room.Dao;
 import androidx.room.Delete;
+import androidx.room.Ignore;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 
 import java.util.List;
 
+import io.reactivex.Completable;
+import io.reactivex.Flowable;
+import io.reactivex.Maybe;
+
 @Dao
 public interface SmatrfinDao {
-    // Названия грузим из нового списка, если что-то поменялось
-    @Query("SELECT * FROM CartItem WHERE receipt_id = :receipt_id")
-    List<CartItem> loadCartItems(Long receipt_id);
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void saveCartItem(CartItem item);
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    List<Long> saveCartItems(List<CartItem> items);
-
-    @Delete()
-    void DeleteCartItems(List<CartItem> path);
+    /** Исключительно для создания продукта при первом запуске в MainActivity */
 
     @Query("SELECT * FROM ProductItem ORDER BY name")
     List<ProductItem> loadProductList();
@@ -30,24 +24,33 @@ public interface SmatrfinDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void saveProductList(List<ProductItem> path);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void saveProductItem(ProductItem path);
-
-
     @Query("SELECT * FROM CategoryItem ORDER BY name")
     List<CategoryItem> loadCategoryList();
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void saveCategoryList(List<CategoryItem> path);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void saveCategoryItem(CategoryItem path);
+    /** RxJava2 */
 
+    @Query("SELECT * FROM CategoryItem ORDER BY name")
+    Flowable<List<CategoryItem>> rx_loadCategoryList();
+
+    @Query("SELECT * FROM ProductItem ORDER BY name")
+    Flowable<List<ProductItem>> rx_loadProductList();
 
     @Query("SELECT * FROM Cart WHERE isClosed = 0 ORDER BY _id DESC LIMIT 1")
-    Cart loadLastCart();
+    Maybe<Cart> rx_loadLastCart();
+
+    @Query("SELECT * FROM CartItem WHERE receipt_id = :receipt_id")
+    Flowable<List<CartItem>> rx_loadCartItems(Long receipt_id);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long saveCart(Cart cart);
+    Maybe<Long> rx_saveCart(Cart cart);
+
+    @Delete()
+    Maybe<Void> rx_DeleteCartItems(List<CartItem> path);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    Completable rx_saveCartItems(List<CartItem> items);
 
 }
