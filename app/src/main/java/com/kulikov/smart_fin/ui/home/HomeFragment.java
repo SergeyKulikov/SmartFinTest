@@ -15,14 +15,12 @@ import android.widget.TableLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -32,10 +30,10 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.kulikov.smart_fin.MyRoundNumeric;
-import com.kulikov.smart_fin.db.Cart;
 import com.kulikov.smart_fin.ProductList;
 import com.kulikov.smart_fin.R;
 import com.kulikov.smart_fin.SmatrfinApp;
+import com.kulikov.smart_fin.db.Cart;
 import com.kulikov.smart_fin.db.CartItem;
 import com.kulikov.smart_fin.db.CategoryItem;
 import com.kulikov.smart_fin.db.ProductItem;
@@ -48,6 +46,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import io.reactivex.CompletableObserver;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.observers.DisposableMaybeObserver;
+import io.reactivex.schedulers.Schedulers;
 
 
 public class HomeFragment extends Fragment {
@@ -75,61 +80,112 @@ public class HomeFragment extends Fragment {
     private Button btnPay;
 
 
+    private final String separator = String.valueOf(new DecimalFormatSymbols(Locale.getDefault()).getDecimalSeparator());
+    private int decimal_count;
+
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         db = SmatrfinApp.getInstance().getSmatrfinDatabase().getDaoDatabase();
 
-        cart = new Cart();
 
         homeViewModel =
                 new ViewModelProvider(this).get(HomeViewModel.class);
         View root = inflater.inflate(R.layout.fragment_home, container, false);
-        final FragmentActivity fragmentActivity = getActivity();
+
 
         context = getContext();
 
-        tabLayoutAdapter = new TabLayoutAdapter(fragmentActivity, categoryList);
+        initUI(root);
 
-        myViewPager2 = root.findViewById(R.id.viewpager);
-        myViewPager2.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
-        myViewPager2.setAdapter(tabLayoutAdapter);
+        db.rx_loadCategoryList()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(categoryItems -> {
+                    categoryItems.add(0, new CategoryItem(null, "Все", "КГ", 0));
+                    categoryList = categoryItems;
+                    tabLayoutAdapter.setData(categoryList);
+                    // tabLayoutAdapter.notifyDataSetChanged();
+                });
 
-        tableLayout = root.findViewById(R.id.tableLayout);
-        tabLayout = root.findViewById(R.id.tab_layout);
-        tabLayout.setTabMode(TabLayout.MODE_SCROLLABLE);
 
-        new TabLayoutMediator(tabLayout, myViewPager2,
-                (tab, position) -> tab.setText(categoryList.get(position).getName())
-        ).attach();
+        db.rx_loadCategoryList()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(categoryItems -> {
+                    categoryItems.add(0, new CategoryItem(null, "Все", "КГ", 0));
+                    categoryList = categoryItems;
+                    tabLayoutAdapter.setData(categoryList);
+                });
 
-        cartAdapter = new CartAdapter(getContext(), cart);
-        recyclerCart = root.findViewById(R.id.rvCartItems);
-        recyclerCart.setLayoutManager(new LinearLayoutManager(fragmentActivity));
+        productList = ProductList.getInstance();
+        db.rx_loadProductList()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(productItems -> productList.setData(productItems));
 
-        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(fragmentActivity,
-                RecyclerView.VERTICAL);
-        recyclerCart.addItemDecoration(dividerItemDecoration);
+        cart = Cart.getInstance();
+        load_rxLastCart();
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                cartAdapter = new CartAdapter(fragmentActivity, cart);
-                fragmentActivity.runOnUiThread(new Runnable() {
+        return root;
+    }
+
+    private void load_rxLastCart() {
+        db.rx_loadLastCart()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new DisposableMaybeObserver<Cart>() {
                     @Override
-                    public void run() {
-                        recyclerCart.setAdapter(cartAdapter);
+                    public void onSuccess(Cart cart1) {
+                        cart.setData(cart1);
+
+                        currentReceiptId = cart.get_id();
+                        cart.set_id(currentReceiptId);
+                        tvReceipt.setText(String.format("# %d", cart.get_id()));
+
+                        load_rxCartItems();
+
+                        tvReceipt.setText(String.format("# %d", cart.get_id()));
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        // ...
+                        Log.e(TAG, e.getLocalizedMessage());
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        // Не удалось найте последнюю открытую запись
+                        save_rxCart();
                     }
                 });
-            }
-        }).start();
 
+    }
+
+    private void load_rxCartItems() {
+        db.rx_loadCartItems(cart.get_id())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(cartItems -> {
+                    cart.setItems(cartItems);
+                    cartAdapter.setData(cart);
+
+                    btnPay.setEnabled(cart.getItems().size() > 0);
+                    tvTotal.setText(String.format("%.2f", cart.calculateTotal()));
+                });
+    }
+
+    private void initUI(View root) {
+        final FragmentActivity fragmentActivity = getActivity();
 
         tvTotal = root.findViewById(R.id.tvTotal);
         btnPay = root.findViewById(R.id.btnPay);
         btnPay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                new CloseCart().execute();
+                cart.setClosed(true);
+                cart.setReceiptTime(new Date().getTime());
+
+                save_rxCart();
             }
         });
 
@@ -138,17 +194,24 @@ public class HomeFragment extends Fragment {
         tvClearCart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                 // очистить базу данных от незакрытых позиций
-                new ClearCart().execute();
+                // очистить базу данных от незакрытых позиций
+                // new ClearCart().execute();
+                Clear_rxCart();
             }
         });
 
         tvReceipt = root.findViewById(R.id.tvReceipt);
+        tableLayout = root.findViewById(R.id.tableLayout);
+        tabLayout = root.findViewById(R.id.tab_layout);
 
-        new LoadTabs().execute();
-        new LoadProducts().execute();
-        new LoadLastReceipt().execute();
+        tabLayout.setTabMode(TabLayout.MODE_SCROLLABLE);
 
+
+        // созаем закладки и сдой данных
+        tabLayoutAdapter = new TabLayoutAdapter(fragmentActivity, categoryList);
+        myViewPager2 = root.findViewById(R.id.viewpager);
+        myViewPager2.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
+        myViewPager2.setAdapter(tabLayoutAdapter);
         myViewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
@@ -193,7 +256,7 @@ public class HomeFragment extends Fragment {
                 super.onPageSelected(position);
                 cartAdapter.setData(cart);
                 cartAdapter.notifyDataSetChanged();
-                btnPay.setEnabled(cart.getItems().size()>0);
+                btnPay.setEnabled(cart.getItems().size() > 0);
             }
 
             @Override
@@ -202,167 +265,75 @@ public class HomeFragment extends Fragment {
             }
         });
 
-        return root;
+        new TabLayoutMediator(tabLayout, myViewPager2,
+                (tab, position) -> tab.setText(categoryList.get(position).getName())
+        ).attach();
+
+        // Подлючаем корзину
+        cartAdapter = new CartAdapter(getContext(), cart);
+        recyclerCart = root.findViewById(R.id.rvCartItems);
+        recyclerCart.setLayoutManager(new LinearLayoutManager(fragmentActivity));
+
+        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(fragmentActivity,
+                RecyclerView.VERTICAL);
+        recyclerCart.addItemDecoration(dividerItemDecoration);
+        cartAdapter = new CartAdapter(fragmentActivity, cart);
+        recyclerCart.setAdapter(cartAdapter);
+
     }
 
-    private class LoadTabs extends AsyncTask<Void, Void, Void> {
-        @Override
-        protected Void doInBackground(Void... voids) {
-            categoryList = db.loadCategoryList();
-            categoryList.add(0, new CategoryItem(null, "Все", "КГ", 0));
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            tabLayoutAdapter.setData(categoryList);
-            super.onPostExecute(aVoid);
-        }
+    private void save_rxCart() {
+        db.rx_saveCart(cart)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(id -> {
+                    cart.clear();
+                    load_rxLastCart();
+                });
     }
 
-    private class LoadProducts extends AsyncTask<Void, Void, Void> {
-        public ProductFragment productFragment;
+    private void save_rxCartItems() {
+        db.rx_saveCartItems(cart.getItems())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(@io.reactivex.annotations.NonNull Disposable d) {
 
-        @Override
-        protected Void doInBackground(Void... voids) {
-            if (productList == null) {
-                productList = new ProductList(db.loadProductList());
-            }
-            return null;
-        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        load_rxLastCart();
+
+                        btnPay.setEnabled(cart.getItems().size()>0);
+                        tvTotal.setText(String.format(Locale.getDefault(), "%.2f", cart.calculateTotal()));
+                    }
+
+                    @Override
+                    public void onError(@io.reactivex.annotations.NonNull Throwable e) {
+
+                    }
+                });
     }
 
-
-    private class LoadLastReceipt extends AsyncTask<Void, Void, Cart> {
-        @Override
-        protected Cart doInBackground(Void... voids) {
-            return db.loadLastCart();
-        }
-
-        @Override
-        protected void onPostExecute(Cart lastCart) {
-            super.onPostExecute(cart);
-
-            if (lastCart != null) {
-                cart.setData(lastCart);
-                tvReceipt.setText(String.format("# %d", cart.get_id()));
-
-                new LoadCartItems().execute(cart.get_id());
-            } else {
-                new SaveCart().execute();
-            }
-
-        }
-    }
-
-    private class LoadCartItems extends AsyncTask<Long, Void, List<CartItem>> {
-
-        @Override
-        protected List<CartItem> doInBackground(Long... longs) {
-            return db.loadCartItems(longs[0]);
-        }
-
-        @Override
-        protected void onPostExecute(List<CartItem> cartItems) {
-            super.onPostExecute(cartItems);
-
-            cart.setItems(cartItems);
-
-            cartAdapter.setData(cart);
-            cartAdapter.notifyDataSetChanged();
-            btnPay.setEnabled(cart.getItems().size()>0);
-
-            tvTotal.setText(String.format("%.2f", cart.calculateTotal()));
-        }
+    private void Clear_rxCart() {
+        db.rx_DeleteCartItems(cart.getItems())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<Void>() {
+                    @Override
+                    public void accept(Void aVoid) throws Exception {
+                        cart.clear();
+                        load_rxLastCart();
+                    }
+                });
     }
 
 
-    private class SaveCart extends AsyncTask<Void, Void, Long> {
-
-        @Override
-        protected Long doInBackground(Void... voids) {
-            return db.saveCart(cart);
-        }
-
-        @Override
-        protected void onPostExecute(Long aLong) {
-            super.onPostExecute(aLong);
-
-            if (aLong == 0) {
-                Log.d(TAG, "Ошибка записи");
-            } else {
-                currentReceiptId = aLong;
-                cart.set_id(currentReceiptId);
-                tvReceipt.setText(String.format("# %d", cart.get_id()));
-            }
-        }
-    }
-
-    private class SaveCartItems extends AsyncTask<Void, Void, List<Long>> {
-
-        @Override
-        protected List<Long> doInBackground(Void... voids) {
-            return db.saveCartItems(cart.getItems());
-        }
-
-        @Override
-        protected void onPostExecute(List<Long> lst) {
-            super.onPostExecute(lst);
-            for (int i=0; i<lst.size(); i++) {
-                cart.getItems().get(i).set_id(lst.get(i));
-            }
-            cartAdapter.setData(cart);
-            cartAdapter.notifyDataSetChanged();
-            btnPay.setEnabled(cart.getItems().size()>0);
-
-            tvTotal.setText(String.format("%.2f", cart.calculateTotal()));
-        }
-    }
-
-    private class CloseCart extends AsyncTask<Void, Void, Long> {
-
-        @Override
-        protected Long doInBackground(Void... voids) {
-            cart.setClosed(true);
-            cart.setReceiptTime(new Date().getTime());
-            return db.saveCart(cart);
-        }
-
-        @Override
-        protected void onPostExecute(Long aLong) {
-            super.onPostExecute(aLong);
-            cart.clear();
-
-            new LoadLastReceipt().execute();
-
-            cartAdapter.setData(cart);
-            cartAdapter.notifyDataSetChanged();
-            btnPay.setEnabled(cart.getItems().size()>0);
-
-            tvTotal.setText(String.format("%.2f", cart.calculateTotal()));
-        }
-    }
-
-    private class ClearCart extends AsyncTask<Void, Void, Void> {
-        @Override
-        protected Void doInBackground(Void... voids) {
-            db.DeleteCartItems(cart.getItems());
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            super.onPostExecute(aVoid);
-            cart.clear();
-            cartAdapter.setData(cart);
-            cartAdapter.notifyDataSetChanged();
-            btnPay.setEnabled(cart.getItems().size()>0);
-            tvTotal.setText(String.format("%.2f", cart.calculateTotal()));
-        }
-    }
-
-
-    /** ------------------------------- */
+    /**
+     * -------------------------------
+     */
 
     private String currentWeight;
     private double value;
@@ -376,21 +347,25 @@ public class HomeFragment extends Fragment {
         return result;
     }
 
-
-
     public CartItem getWeightFromVirtualKeyboard(ProductItem productItem, Cart cart, CartAdapter cartAdapter) {
 
         CartItem cartItem = new CartItem(productItem);
 
         AlertDialog dialog = new AlertDialog.Builder(context).create();
 
-        LayoutInflater inflater = ((Activity)context).getLayoutInflater();
+        LayoutInflater inflater = ((Activity) context).getLayoutInflater();
         View view = inflater.inflate(R.layout.activity_keyboard2, null);
 
+        TextView tvProductName = view.findViewById(R.id.tvProductName);
+        TextView tvProductCalculation = view.findViewById(R.id.tvProductCalculation1);
         TextView tvCalculation = view.findViewById(R.id.tvCalculation);
 
         currentWeight = "0";
         value = showCurrentWeight(tvCalculation, currentWeight);
+        decimal_count = 0;
+
+        tvProductName.setText(productItem.getName());
+        tvProductCalculation.setText(String.format("%.2f",MyRoundNumeric.roundTo(productItem.getPrice()*value)));
 
         int[] button_res_id = {
                 R.id.btnNum1, R.id.btnNum2, R.id.btnNum3,
@@ -421,6 +396,8 @@ public class HomeFragment extends Fragment {
                     }
 
                     value = showCurrentWeight(tvCalculation, currentWeight);
+
+                    tvProductCalculation.setText(String.format("%.2f",MyRoundNumeric.roundTo(productItem.getPrice()*value)));
                 }
 
                 private void addSimbol(String smb) {
@@ -429,10 +406,12 @@ public class HomeFragment extends Fragment {
                         return;
                     }
 
-                    if (currentWeight.substring(0, 1).equals("0") && !isSetDecimalSeparator) {
+                    if (currentWeight.startsWith("0") && !isSetDecimalSeparator) {
                         currentWeight = smb;
                     } else {
-                        currentWeight = currentWeight + smb;
+                        if (decimal_count++ < 2) {
+                            currentWeight = currentWeight + smb;
+                        }
                     }
                 }
 
@@ -442,8 +421,6 @@ public class HomeFragment extends Fragment {
                 }
 
                 private void setDecimal() {
-                    DecimalFormatSymbols otherSymbols = otherSymbols = new DecimalFormatSymbols(Locale.getDefault());
-                    String separator = String.valueOf(otherSymbols.getDecimalSeparator());
 
                     if (!currentWeight.contains(separator)) {
                         currentWeight = currentWeight + separator;
@@ -461,10 +438,7 @@ public class HomeFragment extends Fragment {
             public void onClick(DialogInterface dialog, int id) {
                 // Закрываем окно
                 cart.add(productItem, value);
-                new SaveCartItems().execute();
-
-                // cartAdapter.setData(cart);
-                // cartAdapter.notifyDataSetChanged();
+                save_rxCartItems();
                 dialog.cancel();
             }
         });
@@ -476,16 +450,13 @@ public class HomeFragment extends Fragment {
         });
         dialog.setCancelable(false);
 
-        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override
-            public void onShow(DialogInterface dialog) {
-                Button positiveButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_POSITIVE);
-                positiveButton.setBackgroundColor(Color.argb(255, 25, 161, 216));
-                positiveButton.setTextColor(Color.argb(255, 255, 255, 255));
+        dialog.setOnShowListener(dialog1 -> {
+            Button positiveButton = ((AlertDialog) dialog1).getButton(AlertDialog.BUTTON_POSITIVE);
+            positiveButton.setBackgroundColor(Color.argb(255, 25, 161, 216));
+            positiveButton.setTextColor(Color.argb(255, 255, 255, 255));
 
-                Button negativeButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_NEGATIVE);
-                negativeButton.setTextColor(Color.argb(255, 25, 161, 216));
-            }
+            Button negativeButton = ((AlertDialog) dialog1).getButton(AlertDialog.BUTTON_NEGATIVE);
+            negativeButton.setTextColor(Color.argb(255, 25, 161, 216));
         });
         dialog.show();
 

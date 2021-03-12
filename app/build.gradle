@@ -39,8 +39,14 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.3.0'
 
     implementation 'androidx.room:room-runtime:2.2.6'
+    // implementation "androidx.room:room-ktx:2.2.6" // без этого не работает Flowable
     annotationProcessor 'androidx.room:room-compiler:2.2.6'
+    implementation "androidx.room:room-rxjava2:2.2.6"
+
     implementation 'com.google.android:flexbox:2.0.1'
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.9'
+    implementation 'io.reactivex.rxjava2:rxandroid:2.0.2'
+    implementation "android.arch.persistence.room:rxjava2:1.1.1"
 
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'

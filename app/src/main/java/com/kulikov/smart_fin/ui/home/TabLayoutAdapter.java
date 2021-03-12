@@ -26,11 +26,16 @@ import com.kulikov.smart_fin.db.ProductItem;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Адпатер категорий товаровы
+ *
+ */
+
+
 public class TabLayoutAdapter extends RecyclerView.Adapter<TabLayoutAdapter.MyViewHolder> {
 
     private Context context;
-    private List<CategoryItem> arrayList = new ArrayList<>();
-    private List<ProductItem> productList = new ArrayList<>();
+    private List<CategoryItem> arrayList;
 
     public TabLayoutAdapter(Context context, List<CategoryItem> arrayList) {
         this.context = context;
@@ -46,15 +51,15 @@ public class TabLayoutAdapter extends RecyclerView.Adapter<TabLayoutAdapter.MyVi
     @NonNull
     @Override
     public MyViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // в R.layout.list_item - храним/создаем сетку товаров
+        // в R.layout.list_item - храним/создаем сетку товаров, но не как таблицу, а
+        // виде фрагментов. осути это пустой layout.
         View view = LayoutInflater.from(context).inflate(R.layout.list_item, parent, false);
         return new MyViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull MyViewHolder holder, int position) {
-        // holder.tvName.setText(arrayList.get(position).getName());
-        // holder.tvName.setText(arrayList.get(position).getName());
+        // Слои первоначально пустые и там нет элементов, поэтому здесь ничего не делаем
     }
 
     @Override
@@ -63,13 +68,9 @@ public class TabLayoutAdapter extends RecyclerView.Adapter<TabLayoutAdapter.MyVi
     }
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName;
-        TableLayout tableLayout;
 
         public MyViewHolder(@NonNull View itemView) {
             super(itemView);
-            //tvName = itemView.findViewById(R.id.tvName);
-            // tableLayout = itemView.findViewById(R.id.tableLayout);
         }
     }
 
